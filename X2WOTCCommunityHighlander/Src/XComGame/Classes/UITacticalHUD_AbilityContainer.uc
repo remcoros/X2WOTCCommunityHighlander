@@ -22,6 +22,8 @@ var bool bShownAbilityError;
 var int                      m_iCurrentIndex;    // Index of selected item.
 var int						 m_iPreviousIndexForSecondaryMovement;
 
+// The last History Index that was realized
+var int LastRealizedIndex;
 
 var bool LastSelectionPermitsImmediateSelect;
 var Actor LastTargetActor;
@@ -733,7 +735,7 @@ function protected LatentSubmitGameStateContextCallback(XComGameState GameState)
 		if( PreviousAbilityNewIndex != INDEX_NONE )
 		{
 			// refresh the list of abilities/targets
-			UpdateAbilitiesArray();
+			UpdateAbilitiesArray(GameState.HistoryIndex);
 
 			DirectSelectAbility(PreviousAbilityNewIndex);
 		}
@@ -747,6 +749,9 @@ function protected LatentSubmitGameStateContextCallback(XComGameState GameState)
 		m_iCurrentIndex = -1;
 		LastTargetActor = None;
 		ForceSelectNextTargetID = -1;
+
+		// refresh the list of abilities/targets
+		UpdateAbilitiesArray(GameState.HistoryIndex);
 	}
 }
 
@@ -1012,7 +1017,7 @@ simulated static function bool ShouldShowAbilityIcon(out AvailableAction Ability
 	return true;
 }
 
-simulated function UpdateAbilitiesArray() 
+simulated function UpdateAbilitiesArray(optional int HistoryIndex = -1) 
 {
 	local int i;
 	local int len;
@@ -1023,6 +1028,19 @@ simulated function UpdateAbilitiesArray()
 
 	local AvailableAction AbilityAvailableInfo; //Represents an action that a unit can perform. Usually tied to an ability.
 	
+	if (HistoryIndex == -1)		//	force an update no matter what (e.g. if we switched units, we could realize the same index)
+	{
+		LastRealizedIndex = `XCOMHISTORY.GetCurrentHistoryIndex();
+	}
+	else
+	{
+		if (HistoryIndex <= LastRealizedIndex)
+		{
+			return;
+		}
+
+		LastRealizedIndex = HistoryIndex;
+	}
 
 	//Hide any AOE indicators from old abilities
 	for (i = 0; i < m_arrAbilities.Length; i++)

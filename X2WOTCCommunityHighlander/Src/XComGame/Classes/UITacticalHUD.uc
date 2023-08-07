@@ -270,6 +270,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 
 	//Preview alien heads
 	m_kEnemyPreview = Spawn(class'UITacticalHUD_EnemyPreview', self).InitEnemyTargets();
+	m_kEnemyPreview.m_bSkipUpdateAbilitiesArray = true;
 	
 	//Reinforcements counter
 	m_kCountdown = Spawn(class'UITacticalHUD_Countdown', self).InitCountdown();
@@ -1085,7 +1086,7 @@ simulated function InternalUpdate(bool bForceUpdate, int HistoryIndex)
 		if ( m_isMenuRaised )
 			TargetEnemy(CurrentTargetID);
 		
-		m_kAbilityHUD.UpdateAbilitiesArray();
+		m_kAbilityHUD.UpdateAbilitiesArray(HistoryIndex);
 		m_kEnemyTargets.RefreshTargetHoverData();
 		m_kEnemyTargets.RefreshAllTargetsBuffs();
 		//TEMP: 
@@ -1096,6 +1097,7 @@ simulated function InternalUpdate(bool bForceUpdate, int HistoryIndex)
 	}
 
 	m_bIgnoreShowUntilInternalUpdate = false;
+
 	Show();
 }
 
@@ -1711,7 +1713,8 @@ simulated function Show()
 		return;
 	}
 
-	m_kAbilityHUD.PopulateFlash();
+	// ExitSign: this seems redudant for now since other events will trigger another redraw anyway
+	//m_kAbilityHUD.PopulateFlash();
 
 	Pres = XComPresentationLayer(Movie.Pres);
 

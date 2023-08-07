@@ -20,6 +20,8 @@ struct StateObjectReferenceHitChange
 var array<StateObjectReferenceHitChange> m_arrTargetsUnsorted;
 // End Issue #1233
 
+var int LastActiveUnitObjectID;
+
 var Actor m_kTargetActor;
 var array<StateObjectReference> m_arrTargets;
 var array<StateObjectReference> m_arrCurrentlyAffectable;
@@ -41,6 +43,7 @@ var XGUnit m_highlightedEnemy; //this is the enemy highlighted by hovering over 
 // The last History Index that was realized
 var int LastRealizedIndex;
 var int LatestVisBlockCompletedIndex;
+var bool m_bSkipUpdateAbilitiesArray;
 
 var X2GameRulesetVisibilityManager VisibilityMgr; 
 
@@ -77,7 +80,11 @@ simulated function OnInit()
 	ThisObj = self;
 	EventManager.RegisterForEvent(ThisObj, 'ScamperBegin', OnReEvaluationEvent, ELD_OnVisualizationBlockCompleted);
 	EventManager.RegisterForEvent(ThisObj, 'UnitDied', OnReEvaluationEvent, ELD_OnVisualizationBlockCompleted);
-	EventManager.RegisterForEvent(ThisObj, 'AbilityActivated', OnAbilityActivated, ELD_OnVisualizationBlockCompleted);
+	// ExitSign: this seems to be only used to redraw the abbility array right after when it is activated, without out, we redraw too late
+	// and the bar looks active while the abilities animations are running.
+	// But since this is a global event listener, it is called A LOT and we redraw unnecessarily often.
+	// Instead, we do not listen for the global event, but instead redraw when the ability was accepted in UITacticalHUD_AbilityArray
+	//EventManager.RegisterForEvent(ThisObj, 'AbilityActivated', OnAbilityActivated, ELD_OnVisualizationBlockCompleted);
 
 	InitializeTooltipData();
 	if(!Movie.IsMouseActive())
@@ -207,12 +214,12 @@ simulated function int GetHitChanceForObjectRef(StateObjectReference TargetRef)
 	return -1;
 }
 
-function EventListenerReturn OnAbilityActivated(Object EventData, Object EventSource, XComGameState GameState, Name Event, Object CallbackData)
-{
-	RealizeTargets(GameState.HistoryIndex);
-
-	return ELR_NoInterrupt;
-}
+// function EventListenerReturn OnAbilityActivated(Object EventData, Object EventSource, XComGameState GameState, Name Event, Object CallbackData)
+// {
+// 	RealizeTargets(GameState.HistoryIndex);
+//
+// 	return ELR_NoInterrupt;
+// }
 
 function EventListenerReturn OnReEvaluationEvent(Object EventData, Object EventSource, XComGameState GameState, Name Event, Object CallbackData)
 {
@@ -237,8 +244,12 @@ event OnVisualizationBlockComplete(XComGameState AssociatedGameState)
 }
 
 event OnActiveUnitChanged(XComGameState_Unit NewActiveUnit)
-{
-	RealizeTargets(-1);
+{	
+	if (LastActiveUnitObjectID != NewActiveUnit.ObjectID)
+	{
+		RealizeTargets(-1);
+		LastActiveUnitObjectID = NewActiveUnit.ObjectID;
+	}
 
 	// play the sighted enemies sound whenever changing the active unit if there are any visible enemies
 	if( iNumVisibleEnemies > 0 )
@@ -279,15 +290,21 @@ simulated function RealizeTargets(int HistoryIndex, bool bDontRefreshVisibleEnem
 	}
 	else
 	{
-		if (HistoryIndex < LastRealizedIndex)
+		if (HistoryIndex <= LastRealizedIndex)
+		{
 			return;
+		}
+
 		LastRealizedIndex = HistoryIndex;
 	}
 
 	//  update the abilities array - otherwise when the enemy heads get sorted by hit chance, the cached abilities those functions use could be out of date
-	XComPresentationLayer(Movie.Pres).GetTacticalHUD().m_kAbilityHUD.UpdateAbilitiesArray();
-	XComPresentationLayer(Movie.Pres).GetTacticalHUD().m_kEnemyTargets.MC.FunctionVoid("MoveDown");
-	XComPresentationLayer(Movie.Pres).GetTacticalHUD().m_kEnemyPreview.MC.FunctionVoid("MoveDownPreview");
+	if (!m_bSkipUpdateAbilitiesArray)
+	{
+		XComPresentationLayer(Movie.Pres).GetTacticalHUD().m_kAbilityHUD.UpdateAbilitiesArray(HistoryIndex);
+		XComPresentationLayer(Movie.Pres).GetTacticalHUD().m_kEnemyTargets.MC.FunctionVoid("MoveDown");
+		XComPresentationLayer(Movie.Pres).GetTacticalHUD().m_kEnemyPreview.MC.FunctionVoid("MoveDownPreview");
+	}
 
 	ClearSelectedEnemy();
 	if( !bDontRefreshVisibleEnemies )
