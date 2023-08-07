@@ -80,7 +80,7 @@ event OnVisualizationBlockComplete(XComGameState AssociatedGameState)
 	local bool ForceShowReinforcementsAlert;
 	
 	//Exit early if the state being passed in is older than our latest sync'd state
-	if (AssociatedGameState.HistoryIndex < SyncedToState)
+	if (AssociatedGameState.HistoryIndex <= SyncedToState || !AssociatedGameState.GetContext().bLastEventInChain)
 	{
 		return;
 	}
